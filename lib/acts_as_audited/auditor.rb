@@ -79,7 +79,7 @@ module ActsAsAudited
         attr_protected :audit_ids if options[:protect]
         Audit.audited_class_names << self.to_s
 
-        after_create  :audit_create if !options[:on] || (options[:on] && options[:on].include?(:create))
+        after_create :audit_create if !options[:on] || (options[:on] && options[:on].include?(:create))
         before_update :audit_update if !options[:on] || (options[:on] && options[:on].include?(:update))
         before_destroy :audit_destroy if !options[:on] || (options[:on] && options[:on].include?(:destroy))
 
@@ -98,6 +98,15 @@ module ActsAsAudited
     end
 
     module InstanceMethods
+
+      def created_by
+        new_record? ? Thread.current[:acts_as_audited_user] : audits.first.user
+      end
+
+      def updated_by
+        new_record? ? Thread.current[:acts_as_audited_user] : audits.last.user
+      end
+
 
       # Temporarily turns off auditing while saving.
       def save_without_auditing
@@ -176,7 +185,7 @@ module ActsAsAudited
       private
 
       def audited_changes
-        changed_attributes.except(*non_audited_columns).inject({}) do |changes,(attr, old_value)|
+        changed_attributes.except(*non_audited_columns).inject({}) do |changes, (attr, old_value)|
           changes[attr] = [old_value, self[attr]]
           changes
         end
@@ -185,30 +194,30 @@ module ActsAsAudited
       def audits_to(version = nil)
         if version == :previous
           version = if self.version
-            self.version - 1
-          else
-            previous = audits.descending.offset(1).first
-            previous ? previous.version : 1
-          end
+                      self.version - 1
+                    else
+                      previous = audits.descending.offset(1).first
+                      previous ? previous.version : 1
+                    end
         end
         audits.where(['version <= ?', version])
       end
 
       def audit_create
         write_audit(:action => 'create', :audited_changes => audited_attributes,
-          :comment => audit_comment)
+                    :comment => audit_comment)
       end
 
       def audit_update
         unless (changes = audited_changes).empty?
           write_audit(:action => 'update', :audited_changes => changes,
-            :comment => audit_comment)
+                      :comment => audit_comment)
         end
       end
 
       def audit_destroy
         write_audit(:action => 'destroy', :audited_changes => audited_attributes,
-          :comment => audit_comment)
+                    :comment => audit_comment)
       end
 
       def write_audit(attrs)
@@ -265,8 +274,8 @@ module ActsAsAudited
       # made by +user+. This is not model specific, the method is a
       # convenience wrapper around
       # @see Audit#as_user.
-      def audit_as( user, &block )
-        Audit.as_user( user, &block )
+      def audit_as(user, &block)
+        Audit.as_user(user, &block)
       end
 
     end
